@@ -1,6 +1,6 @@
-const fs = require('fs');
-const fetch = require('node-fetch');
-const randomUserAgent = require('random-user-agent'); // 用于生成随机的 User-Agent
+import fakeUa from 'fake-useragent';
+import fs from 'fs';
+import fetch from 'node-fetch';
 
 const logger = (message, level = 'info', value = '') => {
     const now = new Date().toISOString();
@@ -81,7 +81,7 @@ const loginUser = async (email, password) => {
 
     for (const { email, password } of accounts) {
         let proxy = proxies[attempt % proxies.length]; // Rotate proxies
-        let userAgent = randomUserAgent();
+        let userAgent = fakeUa();
         let acceptLanguage = getRandomAcceptLanguage(); // Generate a random Accept-Language
 
         while (attempt < maxRetries) {
@@ -109,7 +109,7 @@ const loginUser = async (email, password) => {
                 logger('Login successful, got Token:', 'success', accessToken);
 
                 // Save to token.txt in the format: token:proxy:user-agent:accept-language
-                const tokenInfo = `${accessToken}:${proxy.ip}:${proxy.username}:${proxy.port}:${userAgent}:${acceptLanguage}\n`;
+                const tokenInfo = `${accessToken}__${proxyUrl}__${userAgent}__${acceptLanguage}\n`;
                 fs.appendFileSync('token.txt', tokenInfo, 'utf8');
                 logger('Access token and proxy information saved to token.txt');
 

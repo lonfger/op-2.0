@@ -1,7 +1,7 @@
-import fetch from 'node-fetch';
-import fs from 'fs';
 import chalk from 'chalk';
+import fs from 'fs';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import fetch from 'node-fetch';
 import { banner } from './utils/banner.js';
 import { logger } from './utils/logger.js';
 
@@ -9,15 +9,15 @@ const getRandomQuality = () => {
     return Math.floor(Math.random() * (99 - 60 + 1)) + 60;
 };
 
-const getProxies = () => {
-    return fs.readFileSync('proxy.txt', 'utf8').split('\n').map(line => line.trim()).filter(Boolean);
-};
-
 const getTokens = () => {
     return fs.readFileSync('token.txt', 'utf8').split('\n').map(line => line.trim()).filter(Boolean);
 };
 
-const shareBandwidth = async (token, proxy) => {
+async function sleep(duration) {
+ return new Promise((resolve) => setTimeout(resolve, duration * 1000)); 
+}
+
+const shareBandwidth = async (token, proxy, useragent, language) => {
     const quality = getRandomQuality(); 
     const proxyAgent = new HttpsProxyAgent(proxy);
     const maxRetries = 5; 
@@ -30,9 +30,11 @@ const shareBandwidth = async (token, proxy) => {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
+                    "User-Agent": useragent, 
+                    "Accept-language": language
                 },
                 body: JSON.stringify({ quality }),
-                agent: proxyAgent,
+                // agent: proxyAgent,
             });
 
             if (!response.ok) {
@@ -57,7 +59,7 @@ const shareBandwidth = async (token, proxy) => {
             if (attempt >= maxRetries) {
                 logger(`Max retries reached. Skipping.`, 'error');
             } else {
-                await new Promise((resolve) => setTimeout(resolve, 1000)); 
+              await sleep(10)
             }
         }
     }
@@ -65,18 +67,12 @@ const shareBandwidth = async (token, proxy) => {
 
 const shareBandwidthForAllTokens = async () => {
     const tokens = getTokens();
-    const proxies = getProxies();
-
-    if (tokens.length !== proxies.length) {
-        logger('The number of tokens and proxies do not match!', 'error');
-        return;
-    }
 
     for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
-        const proxy = proxies[i];
+        const [token, proxy, useragent, language] = tokens[i].split('__');
         try {
-            const response = await checkMissions(token, proxy);
+            const response = await checkMissions(token, proxy, useragent, language);
+            await sleep(15)
             if (response && Array.isArray(response.missions)) {
                 const availableMissionIds = response.missions
                     .filter(mission => mission.status === 'available')
@@ -85,7 +81,8 @@ const shareBandwidthForAllTokens = async () => {
                 logger('Available Missions:', 'info', availableMissionIds.length);
                 for (const missionId of availableMissionIds) {
                     logger(`Do and complete mission Id: ${missionId}`, 'info');
-                    const completeMission = await doMissions(missionId, token, proxy)
+                    const completeMission = await doMissions(missionId, token, proxy, useragent, language)
+                    await sleep(25)
 
                     logger(`Mission Id: ${missionId} Complete: ${completeMission.message}`)
                 }
@@ -95,13 +92,14 @@ const shareBandwidthForAllTokens = async () => {
         };
 
         try {
-            await shareBandwidth(token, proxy);
+            await sleep(18)
+            await shareBandwidth(token, proxy, useragent, language);
         } catch (error) {
             logger(`Error processing token: ${token}, Error: ${error.message}`, 'error');
         }
     }
 };
-const checkMissions = async (token, proxy) => {
+const checkMissions = async (token, proxy, useragent, language) => {
     try {
         const proxyAgent = new HttpsProxyAgent(proxy);
 
@@ -110,6 +108,8 @@ const checkMissions = async (token, proxy) => {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
+                "User-Agent": useragent, 
+                "Accept-language": language
             },
             agent: proxyAgent,  
         });
@@ -125,7 +125,7 @@ const checkMissions = async (token, proxy) => {
         logger('Error Fetch Missions!', 'error', error.message);
     }
 };
-const doMissions = async (missionId, token, proxy) => {
+const doMissions = async (missionId, token, proxy, useragent, language) => {
     try {
         const proxyAgent = new HttpsProxyAgent(proxy);
 
@@ -134,6 +134,8 @@ const doMissions = async (missionId, token, proxy) => {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
+                "User-Agent": useragent, 
+                "Accept-language": language
             },
             agent: proxyAgent,  
         });
